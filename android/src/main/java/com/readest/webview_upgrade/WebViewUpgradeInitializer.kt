@@ -4,6 +4,7 @@ import android.app.ActivityManager
 import android.app.Activity
 import android.app.Application
 import android.content.Context
+import android.content.pm.PackageInfo
 import android.os.Build
 import android.os.Bundle
 import android.os.Process
@@ -63,7 +64,7 @@ class WebViewUpgradeInitializer : Initializer<Unit> {
                 TAG,
                 "System WebView: package=${systemPkg.packageName} " +
                     "versionName=${systemPkg.versionName} " +
-                    "versionCode=${systemPkg.longVersionCode}"
+                    "versionCode=${versionCodeCompat(systemPkg)}"
             )
         } else {
             Log.w(TAG, "System WebView: NONE / could not query")
@@ -218,6 +219,15 @@ class WebViewUpgradeInitializer : Initializer<Unit> {
         val head = versionName.takeWhile { it.isDigit() }
         return head.toIntOrNull() ?: -1
     }
+
+    // PackageInfo.longVersionCode was introduced in API 28 (P). The plugin's
+    // minSdk is 21, and devices in the wild (e.g. Kobo mooInk Plus 2 on API 27)
+    // still call into here, so an unguarded read crashes with NoSuchMethodError.
+    // Fall back to the deprecated int versionCode on API < 28.
+    @Suppress("DEPRECATION")
+    private fun versionCodeCompat(info: PackageInfo): Long =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.longVersionCode
+        else info.versionCode.toLong()
 
     // App Startup invokes Initializers in the main process only when they're
     // declared under InitializationProvider, but the host may also pull
