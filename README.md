@@ -134,10 +134,10 @@ Both Chromium-major thresholds are configurable via the host app's
 }
 ```
 
-| Key | Default | Meaning |
-| --- | --- | --- |
-| `minUpgradeMajor` | `121` | If the system WebView's Chromium major is below this, the plugin will try to swap to `com.google.android.webview` (when that package is installed at major ≥ this same threshold). Bump it when your app starts depending on newer web features. |
-| `minSupportedMajor` | `92` | If **both** `com.android.webview` and `com.google.android.webview` are below this major (or not installed), and no upgrade was performed, the plugin shows a modal `AlertDialog` on first Activity resume telling the user their WebView is too old. Pick a value that maps to "modern enough to render most of the open web" — i.e. below this the app is effectively unsupported. |
+| Key                 | Default | Meaning                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `minUpgradeMajor`   | `121`   | If the system WebView's Chromium major is below this, the plugin will try to swap to `com.google.android.webview` (when that package is installed at major ≥ this same threshold). Bump it when your app starts depending on newer web features.                                                                                                                                    |
+| `minSupportedMajor` | `92`    | If **both** `com.android.webview` and `com.google.android.webview` are below this major (or not installed), and no upgrade was performed, the plugin shows a modal `AlertDialog` on first Activity resume telling the user their WebView is too old. Pick a value that maps to "modern enough to render most of the open web" — i.e. below this the app is effectively unsupported. |
 
 ### How it reaches Kotlin
 
