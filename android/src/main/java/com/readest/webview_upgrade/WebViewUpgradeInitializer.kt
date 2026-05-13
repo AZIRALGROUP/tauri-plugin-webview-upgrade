@@ -79,20 +79,24 @@ class WebViewUpgradeInitializer : Initializer<Unit> {
 
         val systemMajor = majorOf(systemPkg?.versionName)
         val androidWebViewMajor = installedPackageMajor(context, ANDROID_WEBVIEW_PKG)
-        val googleWebViewMajor = installedPackageMajor(context, GOOGLE_WEBVIEW_PKG)
+        val upgradeCandidates = UPGRADE_CANDIDATES.map { pkg ->
+            pkg to installedPackageMajor(context, pkg)
+        }
 
-        val upgradedSuccessfully = maybeRunUpgrade(context, systemMajor, googleWebViewMajor)
+        val upgradedSuccessfully = maybeRunUpgrade(context, systemMajor, upgradeCandidates)
 
-        // Notice condition: if neither com.android.webview nor
-        // com.google.android.webview meets the "supported" threshold AND we
+        // Notice condition: if neither com.android.webview nor any of the
+        // upgrade candidates (com.google.android.webview plus the .beta /
+        // .dev / .canary channels as fallbacks for devices where the stable
+        // channel is also locked) meets the "supported" threshold AND we
         // didn't successfully upgrade to a recent provider, the user is
-        // about to see a degraded render. Schedule a modal AlertDialog
-        // for the first Activity that comes to the foreground.
+        // about to see a degraded render. Schedule a modal AlertDialog for
+        // the first Activity that comes to the foreground.
         // "Not installed" (-1) is treated as "below threshold" — the user
         // can't render from it.
         if (!upgradedSuccessfully &&
             androidWebViewMajor < WebViewUpgradeConfig.MIN_SUPPORTED_MAJOR &&
-            googleWebViewMajor < WebViewUpgradeConfig.MIN_SUPPORTED_MAJOR
+            upgradeCandidates.all { (_, major) -> major < WebViewUpgradeConfig.MIN_SUPPORTED_MAJOR }
         ) {
             scheduleOutdatedNotice(context)
         }
@@ -101,7 +105,7 @@ class WebViewUpgradeInitializer : Initializer<Unit> {
     private fun maybeRunUpgrade(
         context: Context,
         systemMajor: Int,
-        googleWebViewMajor: Int,
+        candidates: List<Pair<String, Int>>,
     ): Boolean {
         if (systemMajor < 0) {
             Log.i(TAG, "Could not determine system WebView major version; leaving as-is")
@@ -115,22 +119,26 @@ class WebViewUpgradeInitializer : Initializer<Unit> {
             )
             return true
         }
-        if (googleWebViewMajor < WebViewUpgradeConfig.MIN_UPGRADE_MAJOR) {
+        // Candidates are tried in preference order — stable channel first,
+        // then the .dev channel for users whose stable WebView is itself
+        // not updatable.
+        val viable = candidates.firstOrNull { (_, major) ->
+            major >= WebViewUpgradeConfig.MIN_UPGRADE_MAJOR
+        }
+        if (viable == null) {
+            val summary = candidates.joinToString { (pkg, major) -> "$pkg=$major" }
             Log.w(
                 TAG,
                 "System WebView major=$systemMajor < ${WebViewUpgradeConfig.MIN_UPGRADE_MAJOR}, " +
-                    "but $GOOGLE_WEBVIEW_PKG is not viable (major=$googleWebViewMajor). " +
+                    "but no upgrade candidate is viable ($summary). " +
                     "Sideload a recent $GOOGLE_WEBVIEW_PKG APK to fix rendering."
             )
             return false
         }
+        val (pkg, major) = viable
 
-        Log.i(
-            TAG,
-            "Upgrading WebView: system major=$systemMajor -> " +
-                "$GOOGLE_WEBVIEW_PKG major=$googleWebViewMajor"
-        )
-        WebViewUpgrade.upgrade(UpgradePackageSource(context, GOOGLE_WEBVIEW_PKG))
+        Log.i(TAG, "Upgrading WebView: system major=$systemMajor -> $pkg major=$major")
+        WebViewUpgrade.upgrade(UpgradePackageSource(context, pkg))
 
         return when {
             WebViewUpgrade.isCompleted() -> {
@@ -249,10 +257,27 @@ class WebViewUpgradeInitializer : Initializer<Unit> {
         private const val TAG = "WebViewUpgrade"
 
         private const val GOOGLE_WEBVIEW_PKG = "com.google.android.webview"
+        private const val GOOGLE_WEBVIEW_BETA_PKG = "com.google.android.webview.beta"
+        private const val GOOGLE_WEBVIEW_DEV_PKG = "com.google.android.webview.dev"
+        private const val GOOGLE_WEBVIEW_CANARY_PKG = "com.google.android.webview.canary"
         private const val ANDROID_WEBVIEW_PKG = "com.android.webview"
+
+        // Upgrade preference order: stable first, then progressively less
+        // stable channels as fallbacks for devices where the stable
+        // com.google.android.webview is also pinned to an old version and
+        // can't be updated through normal channels.
+        private val UPGRADE_CANDIDATES = listOf(
+            GOOGLE_WEBVIEW_PKG,
+            GOOGLE_WEBVIEW_BETA_PKG,
+            GOOGLE_WEBVIEW_DEV_PKG,
+            GOOGLE_WEBVIEW_CANARY_PKG,
+        )
 
         private val PROBED_PACKAGES = listOf(
             GOOGLE_WEBVIEW_PKG,
+            GOOGLE_WEBVIEW_BETA_PKG,
+            GOOGLE_WEBVIEW_DEV_PKG,
+            GOOGLE_WEBVIEW_CANARY_PKG,
             ANDROID_WEBVIEW_PKG,
             "com.android.chrome",
             "com.huawei.webview",

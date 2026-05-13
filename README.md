@@ -85,24 +85,32 @@ On Android, at process attach:
 
 1. Probe the system WebView via `WebView.getCurrentWebViewPackage()`.
 2. Probe these candidate packages and log what's installed:
-   `com.google.android.webview`, `com.android.webview`, `com.android.chrome`,
-   `com.huawei.webview`. (All four are listed in the plugin's `<queries>`
-   so they're visible on Android 11+.)
+   `com.google.android.webview`, `com.google.android.webview.beta`,
+   `com.google.android.webview.dev`, `com.google.android.webview.canary`,
+   `com.android.webview`, `com.android.chrome`, `com.huawei.webview`. (All
+   seven are listed in the plugin's `<queries>` so they're visible on
+   Android 11+.)
 3. If the system WebView's Chromium major is **≥ `minUpgradeMajor`** (default
    `121`), do nothing.
-4. Otherwise, if `com.google.android.webview` is installed at major
-   **≥ `minUpgradeMajor`**, swap the in-process WebView provider to it via
+4. Otherwise, try the upgrade candidates in preference order — stable
+   `com.google.android.webview` first, then `…beta`, `…dev`, and finally
+   `…canary` as progressively less-stable fallbacks for devices where the
+   stable channel is also pinned to an old version. The first candidate
+   installed at major **≥ `minUpgradeMajor`** wins, and the in-process
+   WebView provider is swapped to it via
    `WebViewUpgrade.upgrade(UpgradePackageSource(...))`.
 5. Otherwise, log a `Log.w` hint telling the user to sideload a recent
    `com.google.android.webview` APK, and leave the system WebView in place.
-6. If **neither** `com.android.webview` **nor** `com.google.android.webview`
-   has a major **≥ `minSupportedMajor`** (default `92`) and no upgrade was
-   performed, register a one-shot `ActivityLifecycleCallbacks` that shows
-   a modal `AlertDialog` on the first Activity resume nudging the user to
-   install Android System WebView. The dialog doesn't auto-dismiss — the
-   user has to tap OK to acknowledge. Dialog text is loaded from the
-   plugin's bundled string resources, so the user's system locale picks
-   the right translation. "Not installed" counts as below threshold.
+6. If **none** of `com.android.webview`, `com.google.android.webview`,
+   `com.google.android.webview.beta`, `com.google.android.webview.dev`, or
+   `com.google.android.webview.canary` has a major **≥ `minSupportedMajor`**
+   (default `92`) and no upgrade was performed, register a one-shot
+   `ActivityLifecycleCallbacks` that shows a modal `AlertDialog` on the
+   first Activity resume nudging the user to install Android System WebView.
+   The dialog doesn't auto-dismiss — the user has to tap OK to acknowledge.
+   Dialog text is loaded from the plugin's bundled string resources, so the
+   user's system locale picks the right translation. "Not installed" counts
+   as below threshold.
 
 All paths are wrapped in `try/catch`; an upgrade failure never blocks app
 boot. Look for the `WebViewUpgrade` tag in `logcat`:
@@ -134,10 +142,10 @@ Both Chromium-major thresholds are configurable via the host app's
 }
 ```
 
-| Key                 | Default | Meaning                                                                                                                                                                                                                                                                                                                                                                             |
-| ------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `minUpgradeMajor`   | `121`   | If the system WebView's Chromium major is below this, the plugin will try to swap to `com.google.android.webview` (when that package is installed at major ≥ this same threshold). Bump it when your app starts depending on newer web features.                                                                                                                                    |
-| `minSupportedMajor` | `92`    | If **both** `com.android.webview` and `com.google.android.webview` are below this major (or not installed), and no upgrade was performed, the plugin shows a modal `AlertDialog` on first Activity resume telling the user their WebView is too old. Pick a value that maps to "modern enough to render most of the open web" — i.e. below this the app is effectively unsupported. |
+| Key                 | Default | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `minUpgradeMajor`   | `121`   | If the system WebView's Chromium major is below this, the plugin will try to swap to `com.google.android.webview` (or its `.beta` / `.dev` / `.canary` channels as fallbacks) when one of those packages is installed at major ≥ this same threshold. Bump it when your app starts depending on newer web features.                                                                                                                           |
+| `minSupportedMajor` | `92`    | If `com.android.webview`, `com.google.android.webview`, and the `.beta` / `.dev` / `.canary` Google WebView channels are **all** below this major (or not installed), and no upgrade was performed, the plugin shows a modal `AlertDialog` on first Activity resume telling the user their WebView is too old. Pick a value that maps to "modern enough to render most of the open web" — i.e. below this the app is effectively unsupported. |
 
 ### How it reaches Kotlin
 
@@ -175,7 +183,7 @@ WebViewUpgradeConfig: minUpgradeMajor=121, minSupportedMajor=92 (from tauri.conf
   beyond what upstream provides.** See
   [`WebViewUpgrade`'s compatibility matrix](https://github.com/JonaNorman/WebViewUpgrade#compatibility)
   for tested device models.
-- **The plugin's `<queries>` add four package names to the host manifest.**
+- **The plugin's `<queries>` add seven package names to the host manifest.**
   Listing specific packages is fine under Google Play's package-visibility
   policy (it's `QUERY_ALL_PACKAGES` that draws scrutiny). Mention it in
   your privacy / data-safety disclosures if your store listing requires.
