@@ -30,7 +30,7 @@
             android:exported="false"
             tools:node="merge">
             <meta-data
-                android:name="com.readest.webview_upgrade.WebViewUpgradeInitializer"
+                android:name="com.aziral.books.webview_upgrade.WebViewUpgradeInitializer"
                 android:value="androidx.startup" />
         </provider>
     </application>

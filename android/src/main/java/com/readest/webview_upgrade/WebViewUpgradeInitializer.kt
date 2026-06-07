@@ -1,4 +1,4 @@
-package com.readest.webview_upgrade
+package com.aziral.books.webview_upgrade
 
 import android.app.ActivityManager
 import android.app.Activity
